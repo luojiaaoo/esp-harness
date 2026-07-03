@@ -1,11 +1,11 @@
 ---
 name: esp-serial-port
-description: ESP8266/ESP32 MicroPython development over Windows USB serial: scan COM ports, inspect chip info, flash/erase firmware with esptool, and transfer/run/deploy files with ampy.
+description: ESP8266/ESP32 MicroPython development over Windows USB serial: scan COM ports, inspect chip info, flash/erase firmware with esptool, and deploy/run files with ampy.
 ---
 
 # ESP Serial Port
 
-Use this skill for ESP8266/ESP32 MicroPython development from Windows PowerShell — serial discovery, esptool firmware operations, ampy file operations, and run-vs-deploy workflow (app.py for dev, main.py for production).
+Use this skill for ESP8266/ESP32 MicroPython development from Windows PowerShell — serial discovery, esptool firmware operations, and ampy deployment.
 
 ## 环境准备
 
@@ -155,7 +155,7 @@ Hash of data verified
 
 ## 文件操作
 
-Upload, download, run scripts via `ampy`. If `main.py` is running in a loop, stop it first (see [中止当前程序](#中止当前程序)).
+Upload, download, delete files via `ampy`. If `main.py` is running, stop it first (see [中止当前程序](#中止当前程序)).
 
 ```powershell
 # Upload to board
@@ -163,9 +163,6 @@ ampy --port COM3 put main.py
 
 # Download from board
 ampy --port COM3 get boot.py > boot_backup.py
-
-# Run script without writing to Flash (output printed to terminal)
-ampy --port COM3 run test.py
 
 # Delete / create directory
 ampy --port COM3 rm old.py
@@ -177,36 +174,20 @@ Get-ChildItem *.py | ForEach-Object { ampy --port COM3 put $_.Name }
 
 If ampy hangs, the port may be locked — close other serial monitors and retry. Use `--baud 115200` if the default baud rate causes issues.
 
-## 执行程序
+## 部署运行
 
-### 运行（临时执行）
+用户说"运行"时，完整部署到板子：中止 → 上传 → 复位自启 → 断开串口。
 
-本地入口文件**必须命名为 `app.py`**，禁止使用 `main.py`——避免 `boot.py` 自动引导启动。用户说"运行"时，先将整个项目上传到板子，再执行入口：
-
-```powershell
-# 1. 中止当前程序（见 中止当前程序）
-
-# 2. 上传所有项目文件（app.py 保持原名）
-Get-ChildItem *.py,*.json,*.html | ForEach-Object { ampy --port COM3 put $_.Name }
-
-# 3. 临时运行入口脚本
-ampy --port COM3 run app.py
-```
-
-脚本在板子上执行，输出打印到终端。`app.py` 保持原名不会触发自动启动。后续若仅修改了 `app.py`，可以直接再次 `run` 跳过上传步骤。
-
-### 烧写（部署到板子）
-
-用户明确说"烧写"时，将整个项目部署到板子，上电自动运行。与"运行"的唯一区别：`app.py` 重命名为 `main.py` 使其被 `boot.py` 自动引导：
+本地入口文件命名为 `main.py`，上传后由 `boot.py` 自动引导执行。`main.py` 最后上传，确保其余依赖文件已就位：
 
 ```powershell
-# 1. 中止当前程序（见 中止当前程序）
+# 1. 中止当前程序并删除旧 main.py（见 中止当前程序）
 
-# 2. 上传 app.py → main.py
-ampy --port COM3 put app.py main.py
+# 2. 上传其余文件（main.py 以外的所有文件）
+Get-ChildItem *.py,*.json,*.html -Exclude main.py | ForEach-Object { ampy --port COM3 put $_.Name }
 
-# 3. 上传其余所有文件
-Get-ChildItem *.py,*.json,*.html -Exclude app.py | ForEach-Object { ampy --port COM3 put $_.Name }
+# 3. 最后上传 main.py，上传后板子复位，boot.py 自动引导执行
+ampy --port COM3 put main.py
 ```
 
-烧写后板子复位即自动执行 `main.py`。
+部署完毕即断开串口，不保持连接。
