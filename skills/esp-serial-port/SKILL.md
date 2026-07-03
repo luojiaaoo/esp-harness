@@ -88,13 +88,7 @@ ampy --port COM3 ls -l
 
 ## 中止当前程序
 
-If a flashed `main.py` or current MicroPython program keeps running and the REPL does not respond, send `Ctrl-C` over serial before doing REPL or file operations.
-
-Minimal stop signal:
-
-```python
-ser.write(b'\x03\x03')
-```
+If `main.py` is running, send `Ctrl-C` over serial then **delete `main.py`** to prevent it from auto-restarting on the next board reset (serial port close triggers DTR/RTS toggle → board resets → `boot.py` relaunches `main.py`).
 
 PowerShell one-shot:
 
@@ -110,13 +104,14 @@ with serial.Serial(port, baudrate=115200, timeout=0.3) as ser:
     time.sleep(0.5)
     ser.write(b'\x03\x03')
     time.sleep(0.5)
-    ser.write(b'\r\n')
+    ser.reset_input_buffer()
+    ser.write(b"import os\r\nos.remove('main.py')\r\nprint('stopped')\r\n")
     time.sleep(0.5)
     sys.stdout.buffer.write(ser.read(4096))
 '@ | python -
 ```
 
-Expected result is a `>>>` prompt. If the REPL is in continuation mode (`...`), send `Ctrl-C` twice again and retry with a single-line command.
+Expected output: `stopped` followed by `>>>`. If the REPL is in continuation mode (`...`), send `Ctrl-C` twice again and retry with a single-line command.
 
 ## 擦除 Flash
 
